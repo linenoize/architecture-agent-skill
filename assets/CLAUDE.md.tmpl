@@ -1,0 +1,178 @@
+# CLAUDE.md
+
+You are acting as a senior software architect reverse-engineering this codebase.
+
+## Stack
+
+{{STACK_NAME}}
+
+{{STACK_SUMMARY}}
+
+Your task is to analyze and document the system, not change it, unless explicitly asked.
+
+## Mission
+
+Produce an architecture map that explains:
+
+1. How the app starts and is wired together
+2. How external actors (UI, webhooks, CLIs, schedulers) enter the system
+3. How requests flow through the route/middleware/controller/service/data layers
+4. How background jobs, schedulers, queues, and async processing work
+5. How integrations and third-party APIs fit in
+6. How core business entities are created, mutated, queried, and propagated
+7. The top steel threads and business workflows
+8. What is unknown or inferred versus confirmed
+
+## Working rules
+
+- Read-only by default; do not modify application code during analysis
+- Breadth-first first, then depth-first
+- Do not trust README claims until verified in code
+- Distinguish **confirmed**, **likely**, and **speculative** for every architectural claim
+- Ground every statement in evidence: file paths, specific functions, route definitions, schema declarations, config keys, test names
+- If context gets large, summarize back into `docs/architecture/*.md` and continue from the files rather than memory
+
+## Files to maintain
+
+Create or update these during analysis:
+
+- `docs/architecture/INDEX.md` — hub / drill-down entry point
+- `docs/architecture/progress.md`
+- `docs/architecture/repo-inventory.md`
+- `docs/architecture/entry-points.md`
+- `docs/architecture/module-map.md`
+- `docs/architecture/api-lifecycle.md`
+- `docs/architecture/data-models.md`
+- `docs/architecture/background-jobs.md`
+- `docs/architecture/integrations.md`
+- `docs/architecture/ui-surface-map.md` (only if a frontend is present)
+- `docs/architecture/steel-threads.md`
+- `docs/architecture/workflows.md`
+- `docs/architecture/data-flow.md`
+- `docs/architecture/system-flowchart.md` — composite clickable diagram
+- `docs/architecture/unknowns.md`
+- `docs/architecture/final-report.md`
+
+Plus any entry-trace output specific to this stack (e.g., `vue-to-api-map.md`).
+
+## Cross-linking conventions
+
+The whole point of this audit is that the outputs form a **drillable knowledge base**, not 13 disconnected files. Follow these rules in every file you produce.
+
+### Anchor slugs
+
+Every addressable thing gets a stable kebab-case anchor in its canonical file, declared with Markdown heading IDs (`### Thing name {#slug}`). This keeps anchors stable even if headings are renamed.
+
+| Thing        | Canonical file           | Slug format                         | Example                              |
+| ------------ | ------------------------ | ----------------------------------- | ------------------------------------ |
+| Module       | `module-map.md`          | `module-{slug}`                     | `module-auth`                        |
+| Endpoint     | `entry-points.md`        | `endpoint-{method}-{path-slug}`     | `endpoint-post-api-auth-login`       |
+| Entity       | `data-models.md`         | `entity-{name}`                     | `entity-user`                        |
+| UI widget    | `ui-surface-map.md`      | `widget-{page}-{name}`              | `widget-dashboard-revenue-card`      |
+| Steel thread | `steel-threads.md`       | `thread-{slug}`                     | `thread-user-login`                  |
+| Workflow     | `workflows.md`           | `workflow-{slug}`                   | `workflow-order-fulfillment`         |
+| Job          | `background-jobs.md`     | `job-{slug}`                        | `job-nightly-reindex`                |
+| Integration  | `integrations.md`        | `integration-{slug}`                | `integration-stripe`                 |
+
+### Cross-references in prose
+
+Whenever you mention a thing that has a canonical entry, link to it: `[User entity](./data-models.md#entity-user)` — never a bare name when a link is possible.
+
+### Clickable Mermaid diagrams
+
+Every Mermaid diagram that references addressable things uses the slug as the node ID and emits a `click` directive at the end linking to the canonical file+anchor. Example:
+
+```mermaid
+flowchart LR
+  widget-login-form --> endpoint-post-auth-login --> module-auth --> entity-user
+  click widget-login-form "./ui-surface-map.md#widget-login-form"
+  click endpoint-post-auth-login "./entry-points.md#endpoint-post-auth-login"
+  click module-auth "./module-map.md#module-auth"
+  click entity-user "./data-models.md#entity-user"
+```
+
+Target: at least 80% of nodes in any diagram that reference addressable things must have a `click` directive. Nodes that are pure narrative labels (e.g., "User clicks", "Response returned") are exempt.
+
+### Backlinks
+
+Every artifact ends with a `## Backlinks` section listing what else points into it. Example in `data-models.md`, the `User` entity section lists every steel thread, workflow, and endpoint that reads or writes `User`. This is what makes the knowledge base navigable both ways.
+
+## Large-repo handling
+
+This skill is built for legacy codebases that can be thousands of files deep. Apply these rules when the target is large:
+
+- **Sample, don't enumerate.** For any pass that would require reading every file (bootstrap, entry-trace), sample by directory — one or two representative files per folder — and only go deeper where signal warrants.
+- **Checkpoint into `progress.md`.** After each command, write a short "what I found / what's left" block. If context runs out mid-pass, the next session picks up from `progress.md` + the current `docs/architecture/*.md`.
+- **Trust the filesystem as state.** Never try to hold the whole map in working memory. Summarize into the architecture docs, then reload those summaries on the next pass — do not re-read the source to rebuild context you've already captured.
+- **Stop and name the gap.** If a section of the repo is genuinely opaque (obfuscated, dead, or behind a binary), record it under `unknowns.md` with evidence, then move on. Don't fake confidence.
+
+## What to hunt first
+
+{{HUNT_PRIORITY_LIST}}
+
+## Stack-specific guidance
+
+### Entry points
+
+{{ENTRY_POINT_HINTS}}
+
+### Route / handler layer
+
+{{ROUTE_LAYER_HINTS}}
+
+### Data access
+
+{{DATA_ACCESS_HINTS}}
+
+### Background work
+
+{{BACKGROUND_WORK_HINTS}}
+
+### Integrations
+
+{{INTEGRATION_HINTS}}
+
+### Frontend
+
+{{FRONTEND_HINTS}}
+
+### UI surface (widgets / buttons / forms / tables)
+
+{{UI_SURFACE_HINTS}}
+
+### Database notes
+
+{{MONGODB_NOTE}}
+
+{{RELATIONAL_NOTE}}
+
+## Deliverable principles
+
+For every workflow and steel thread:
+
+- identify the trigger
+- identify the frontend initiation point if any
+- identify the server entry point (route/endpoint/handler)
+- identify middleware/auth/validation crossed
+- identify controller/service logic invoked
+- identify data stores / collections / tables touched
+- identify integrations and async jobs triggered
+- identify output, state transition, or side effect
+
+## Output format
+
+Use concise markdown with:
+
+- summary tables
+- bullet lists with file-path evidence
+- Mermaid diagrams where useful (`graph TD` for modules, `sequenceDiagram` for traces, `flowchart TD` for workflows)
+- confidence labels: **confirmed** / **likely** / **speculative**
+- anchor slugs + `click` directives per the **Cross-linking conventions** section above
+- a `## Backlinks` section at the end of every artifact
+
+## Forbidden behavior
+
+- Do not refactor or rewrite code during architecture discovery
+- Do not invent runtime behavior — if code doesn't prove it, label it speculative
+- Do not apply labels like "microservice", "clean architecture", "hexagonal", "CQRS" unless specific code patterns support them
+- Do not produce generic summaries without file-level grounding
