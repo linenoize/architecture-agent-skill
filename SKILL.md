@@ -13,6 +13,21 @@ This skill installs a reverse-engineering workflow into a target repo — built 
 
 After install, the user can either run `/architecture-run-all` (one command, full pipeline) or step through the individual commands manually. Both produce the same artifacts.
 
+## Invocation
+
+There are three ways to trigger this skill. **All of them run the same install/scaffold flow in the Process section below** — they differ only in how much the user has pre-committed.
+
+- **`/architecture-mapper install`** — the explicit entrypoint. Type it from inside the repo you want to map. `$ARGUMENTS` will be `install` (plus any extra tokens). This means *the user has already opted into scaffolding* — do not ask "do you want to install a 17-command workflow?"; go straight to detection and a single confirm-then-write. Optional extra tokens in `$ARGUMENTS`:
+  - a **path** → use it as the target repo instead of the current working directory (e.g. `/architecture-mapper install ../legacy-app`).
+  - **`--stack <node-express-mongo|python-web|generic>`** → skip auto-detection and use that profile directly.
+  - **`--force`** → resolve any collisions by backing up (`<file>.bak-<date>`) and overwriting without pausing to ask. Never destroys without a backup.
+- **`/architecture-mapper`** (no argument) — same flow, auto-detecting the stack, with the normal Step 1 consent confirm.
+- **Natural language** — "map this repo", "how does this codebase work end-to-end", etc. Auto-triggers the same flow.
+
+At the start of Step 1, read `$ARGUMENTS`. If the first token is `install`, set "explicit-install mode": parse any path / `--stack` / `--force` tokens, honour them, and collapse Steps 1 and 3 into one combined "here's the target + detected stack, writing now" confirmation before the write. Otherwise run Steps 1–6 normally.
+
+> The colon form `/architecture-mapper:install` does **not** work — `:`-namespaced sub-commands are a plugin-only feature, and this ships as a personal/project skill. Use the space form: `/architecture-mapper install`.
+
 ## Why it's built this way
 
 The underlying workflow (from `code-map-architecture.md`) is genuinely good but hardcodes a Vue+Express+Mongo stack. Trying to run it on an ASP.NET app or a Django service produces generic, stack-mismatched hunt lists that miss the real entry points. Two fixes combine in this skill:
@@ -24,13 +39,19 @@ The underlying workflow (from `code-map-architecture.md`) is genuinely good but 
 
 ### Step 1 — Confirm the target directory
 
-Identify the target repo. By default it's the current working directory. If the user's message references a different path, use that. Before doing anything, confirm:
+First, read `$ARGUMENTS` (see **Invocation**). If its first token is `install`, you're in **explicit-install mode**: the user has opted in, so don't re-ask whether to install — extract any path / `--stack` / `--force` tokens and carry them forward. Otherwise proceed normally.
+
+Identify the target repo. By default it's the current working directory. If `$ARGUMENTS` (or the user's message) references a different path, use that. Before doing anything, confirm:
 
 > "I'll install the architecture-mapping workflow into `<path>`. This will create `CLAUDE.md`, `.claude/commands/`, and `docs/architecture/` — ok to proceed?"
+
+In explicit-install mode you may skip this standalone confirm and instead fold the target + detected stack into the single Step 3 summary shown right before writing.
 
 Do not touch the skill's own folder or anything under `~/.claude/`. The install target is always a user project directory.
 
 ### Step 2 — Detect the stack
+
+If `$ARGUMENTS` contains `--stack <name>`, skip detection entirely and use that profile (`references/stacks/<name>.md`); record one evidence line noting the stack was user-forced, then go to Step 3. Otherwise:
 
 Read `references/detection.md`. Walk its precedence table against the target repo using Glob + Read. Stop at the first confident match. Record the evidence (which files + which deps) — you'll show it to the user.
 
@@ -69,6 +90,8 @@ If any exist, show the user what's there and offer:
 - **Skip that file** — leave it alone, install the rest.
 
 Never silently overwrite. A pre-existing `CLAUDE.md` likely contains the user's own project memory and is load-bearing for their daily workflow.
+
+In explicit-install mode with `--force`, don't prompt: apply **Back up + install** to every collision automatically, then report which files were renamed to `<name>.bak-<date>`. `--force` still never deletes without a backup.
 
 ### Step 5 — Install
 
